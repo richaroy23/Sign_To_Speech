@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign to Speech</title>
+  <style>
+    :root {
+      --ink: #1d1633;
+      --paper: #f6f3fb;
+      --card: #fff;
+      --line: #ddd5ee;
+      --accent: #6b2fc9;
+      --soft: #ece3fb;
+      --muted: #625b7c;
+      --ok: #1e8e5a;
+      --okbg: #e6f6ee;
+      --danger: #b3121f;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+      line-height: 1.5;
+    }
+
+    header {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 28px 20px 6px;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: clamp(1.5rem, 4vw, 2.2rem);
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 62ch;
+    }
+
+    main {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 20px;
+      display: grid;
+      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      align-items: start;
+    }
+
+    section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 1.05rem;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: var(--card);
+      color: var(--accent);
+      padding: 8px 14px;
+    }
+
+    button[aria-pressed="true"],
+    button[aria-selected="true"],
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    button:focus-visible,
+    .stage:focus-visible {
+      outline: 3px solid #b79af0;
+      outline-offset: 2px;
+    }
+
+    .tabs,
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .stage {
+      min-height: 250px;
+      border: 2px dashed var(--line);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 12px;
+      background: #fbfaff;
+    }
+
+    .stage.over {
+      border-color: var(--accent);
+      background: var(--soft);
+    }
+
+    .stage img,
+    .stage canvas {
+      max-width: 100%;
+      max-height: 330px;
+      border-radius: 8px;
+    }
+
+    .hint,
+    .status {
+      color: var(--muted);
+      font-size: .92rem;
+    }
+
+    .verdict {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin: 10px 0 4px;
+      min-height: 2.2rem;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: minmax(70px, 30%) 1fr 46px;
+      gap: 10px;
+      align-items: center;
+      margin: 5px 0;
+      font-size: .9rem;
+    }
+
+    .bar,
+    .hold {
+      height: 10px;
+      background: var(--soft);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .bar>span,
+    .hold>span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--accent);
+    }
+
+    .hold.done>span {
+      background: var(--ok);
+    }
+
+    .holdmsg {
+      font-size: .9rem;
+      color: var(--muted);
+      min-height: 1.4em;
+      margin: 4px 0 14px;
+    }
+
+    .sentence {
+      min-height: 80px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 1.5rem;
+      font-weight: 600;
+      word-break: break-word;
+      background: #fbfaff;
+      margin-bottom: 8px;
+    }
+
+    .caret {
+      display: inline-block;
+      width: 2px;
+      height: 1.2em;
+      background: var(--accent);
+      vertical-align: text-bottom;
+      margin-left: 2px;
+      animation: blink 1s steps(1) infinite;
+    }
+
+    .alts {
+      font-size: .88rem;
+      color: var(--muted);
+      min-height: 1.3em;
+      margin: 0 0 10px;
+    }
+
+    .sugg {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 38px;
+      margin-bottom: 12px;
+    }
+
+    .sugg button {
+      background: var(--soft);
+      border-color: var(--soft);
+      color: var(--ink);
+    }
+
+    .banner {
+      display: none;
+      background: #fff6e5;
+      border: 1px solid #f0d49a;
+      color: #6b4300;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+    }
+
+    .banner code {
+      background: #fbe7bd;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    [role="tab"] {
+      border-radius: 8px 8px 0 0;
+    }
+
+    .modetabs {
+      display: flex;
+      gap: 6px;
+      border-bottom: 2px solid var(--soft);
+      margin-bottom: 16px;
+    }
+
+    .target {
+      text-align: center;
+      border: 2px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 12px;
+      background: #fbfaff;
+    }
+
+    .target.win {
+      border-color: var(--ok);
+      background: var(--okbg);
+    }
+
+    .target .letter {
+      font-size: 5.5rem;
+      font-weight: 800;
+      line-height: 1;
+      margin: 0;
+      text-transform: uppercase;
+    }
+
+    .target img {
+      max-height: 150px;
+      max-width: 100%;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+
+    .score {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      font-size: .95rem;
+      margin: 10px 0;
+    }
+
+    .score b {
+      font-size: 1.2rem;
+    }
+
+    #alert {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      background: var(--danger);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+
+    #alert[hidden] {
+      display: none;
+    }
+
+    #alert h2 {
+      font-size: clamp(2.4rem, 10vw, 5rem);
+      margin: 0 0 8px;
+      letter-spacing: .02em;
+    }
+
+    #alert p {
+      font-size: 1.15rem;
+      margin: 4px 0;
+    }
+
+    #alert button {
+      margin-top: 22px;
+      background: #fff;
+      color: var(--danger);
+      border-color: #fff;
+      font-weight: 700;
+      padding: 12px 24px;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    @keyframes pulse {
+      50% {
+        background: #d92b39;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+
+      .caret,
+      #alert {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1 id="title"></h1>
+    <p id="subtitle"></p>
+  </header>
+
+  <main>
+    <section aria-labelledby="cam-h">
+      <h2 id="cam-h">Camera</h2>
+      <div id="banner" class="banner"></div>
+      <div class="tabs" role="group" aria-label="Input source">
+        <button id="src-cam" aria-pressed="true">Webcam</button>
+        <button id="src-up" aria-pressed="false">Upload test image</button>
+      </div>
+      <div id="stage" class="stage" tabindex="0">
+        <p class="hint">Starting camera…</p>
+      </div>
+      <input id="file" type="file" accept="image/*" hidden>
+      <p id="status" class="status">Loading model…</p>
+      <p id="verdict" class="verdict" aria-live="polite">–</p>
+      <div id="bars"></div>
+    </section>
+
+    <section aria-label="Modes">
+      <div class="modetabs" role="tablist" aria-label="Mode">
+        <button role="tab" id="tab-tr" aria-selected="true" aria-controls="panel-tr">Translate</button>
+        <button role="tab" id="tab-ln" aria-selected="false" aria-controls="panel-ln">Learn</button>
+      </div>
+
+      <div id="panel-tr" role="tabpanel" aria-labelledby="tab-tr">
+        <div class="hold" id="hold"><span></span></div>
+        <p id="holdmsg" class="holdmsg">Hold a sign steady to add it.</p>
+        <div id="sentence" class="sentence" aria-live="polite"></div>
+        <p id="alts" class="alts"></p>
+        <div id="sugg" class="sugg" aria-label="Word suggestions"></div>
+        <div class="actions">
+          <button id="speak" class="primary">Speak</button>
+          <button id="space">Space</button>
+          <button id="back">Backspace</button>
+          <button id="clear">Clear</button>
+          <button id="test-alert">Test alert</button>
+        </div>
+      </div>
+
+      <div id="panel-ln" role="tabpanel" aria-labelledby="tab-ln" hidden>
+        <div id="target" class="target">
+          <p class="hint" style="margin:0 0 4px">Show this letter</p>
+          <p id="ln-letter" class="letter">–</p>
+          <div id="ln-ref"></div>
+        </div>
+        <div class="hold" id="ln-hold"><span></span></div>
+        <p id="ln-msg" class="holdmsg" aria-live="polite">Load the model to start.</p>
+        <div class="score">
+          <span>Score <b id="ln-score">0</b></span>
+          <span>Streak <b id="ln-streak">0</b></span>
+          <span>Best streak <b id="ln-best">0</b></span>
+        </div>
+        <div class="actions">
+          <button id="ln-skip">Skip letter</button>
+          <button id="ln-reset">Reset score</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="alert" hidden role="alertdialog" aria-modal="true" aria-labelledby="alert-title">
+    <h2 id="alert-title">I NEED HELP</h2>
+    <p id="alert-time"></p>
+    <p>Demo only: no message is sent to anyone.</p>
+    <button id="dismiss">Dismiss</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+
+  <script>
+    /* ============================================================
+       EDIT THIS BLOCK FIRST
+       ============================================================ */
+    const CONFIG = {
+      // Keep the trailing slash. Hosted: "https://teachablemachine.withgoogle.com/models/XXXXXXX/"
+      // Local folder (needs a local server): "./my_model/"
+      MODEL_URL: "https://teachablemachine.withgoogle.com/models/RahShiq3S/",
+
+      TITLE: "Sign to Speech",
+      SUBTITLE: "Fingerspell with your hands, build a sentence, and let the page read it aloud.",
+
+      CONFIDENCE: 0.8,          // minimum confidence (0 to 1) before a sign counts
+      HOLD_MS: 1000,            // hold time to add a letter or word
+      EMERGENCY_HOLD_MS: 1500,  // longer hold for the emergency sign, to avoid false alarms
+      LEARN_HOLD_MS: 700,       // hold time in Learn mode
+
+      // Class names (case-insensitive)
+      NONE_CLASSES: ["no sign", "none", "background", "nothing", "neutral"],
+      EMERGENCY_CLASSES: ["help"],
+      EMERGENCY_MESSAGE: "I need help",
+
+      // Spelling correction: how many letters may fall outside the model's top 3 guesses
+      MAX_MISSES: 1,
+
+      // Learn mode. Letters to leave out (for example ones your model finds hard),
+      // and optional reference pictures: { a: "img/a.png", b: "img/b.png" }
+      LEARN_EXCLUDE: [],
+      LEARN_IMAGES: {},
+
+      SPEECH_LANG: "en-IN",
+      WEBCAM_SIZE: 320,
+      WEBCAM_FLIP: true,
+
+      // Earlier words are treated as slightly more common. Add words for your demo.
+      WORD_LIST: ["the", "and", "you", "for", "are", "but", "not", "all", "can", "her", "was", "one", "our", "out", "day", "get", "has", "him", "his", "how", "its", "new", "now", "old", "see", "two", "way", "who", "boy", "did", "let", "put", "say", "she", "too", "use", "yes", "no", "help", "hello", "good", "thank", "thanks", "please", "sorry", "water", "food", "home", "school", "friend", "love", "like", "need", "want", "know", "come", "go", "work", "time", "today", "what", "when", "where", "why", "ready", "stop", "safe", "happy", "hungry", "doctor", "police", "people", "girl", "play", "open", "more", "with", "have", "this", "that", "they", "from", "there", "will", "your", "about", "cow", "oil", "bag", "cat", "bad", "ok", "fine", "great", "nice", "welcome", "hope", "bring", "call", "ask", "give", "take", "look", "make", "little", "pain", "done"]
+    };
+    /* ============================================================ */
+
+    const $ = (id) => document.getElementById(id);
+    const stage = $("stage"), fileInput = $("file");
+    let model = null, webcam = null, camOn = false, rafId = null;
+    let mode = "translate", emergencyOn = false, emTimer = null;
+    let tokens = [];                                   // {t:"l",ch,dist} | {t:"w",text} | {t:"s"}
+    let cand = null, candStart = 0, locked = false, acc = {}, frames = 0;
+    const learn = { target: null, start: 0, locked: false, score: 0, streak: 0, best: 0 };
+
+    $("title").textContent = CONFIG.TITLE;
+    $("subtitle").textContent = CONFIG.SUBTITLE;
+    document.title = CONFIG.TITLE;
+
+    const setStatus = (m) => { $("status").textContent = m; };
+    const showBanner = (h) => { const b = $("banner"); b.innerHTML = h; b.style.display = "block"; };
+    const norm = (s) => s.trim().toLowerCase();
+
+    function kindOf(name) {
+      const n = norm(name);
+      if (CONFIG.NONE_CLASSES.includes(n)) return "none";
+      return /^[a-z]$/.test(n) ? "letter" : "word";
+    }
+    const isEmergency = (name) => CONFIG.EMERGENCY_CLASSES.includes(norm(name));
+
+    /* ---------- Model ---------- */
+    async function init() {
+      renderSentence();
+      if (CONFIG.MODEL_URL.includes("PASTE_YOUR_MODEL_URL_HERE")) {
+        showBanner("Add your model link: open this file, find <code>MODEL_URL</code> at the top of the script, and paste the URL from Teachable Machine (Export Model, then Upload my model).");
+        setStatus("No model loaded yet.");
+        return;
+      }
+      const baseUrl = CONFIG.MODEL_URL.trim().replace(/\/+$/, "") + "/";
+      try {
+        model = await tmImage.load(baseUrl + "model.json", baseUrl + "metadata.json");
+        setStatus("Model ready: " + model.getTotalClasses() + " classes.");
+        $("ln-msg").textContent = "Show the letter above and hold it steady.";
+        if (mode === "learn") nextTarget();
+        await startCam();
+      } catch (err) {
+        console.error(err);
+        showBanner("The model could not be loaded. Check that <code>MODEL_URL</code> is correct and ends with “/”. For a local folder, run <code>python -m http.server</code> and open the page from that address.");
+        setStatus("Model failed to load.");
+      }
+    }
+
+    /* ---------- Prediction ---------- */
+    function showTop(preds) {
+      const top5 = [...preds].sort((a, b) => b.probability - a.probability).slice(0, 5);
+      $("bars").innerHTML = top5.map(() => '<div class="row"><span class="n"></span><div class="bar"><span></span></div><span class="pct" style="text-align:right"></span></div>').join("");
+      document.querySelectorAll("#bars .row").forEach((row, i) => {
+        row.querySelector(".n").textContent = top5[i].className;
+        row.querySelector(".bar > span").style.width = (top5[i].probability * 100).toFixed(0) + "%";
+        row.querySelector(".pct").textContent = Math.round(top5[i].probability * 100) + "%";
+      });
+      return top5[0];
+    }
+
+    async function predict(el, live) {
+      if (!model) return;
+      const preds = await model.predict(el);
+      const top = showTop(preds);
+      const sign = top.probability >= CONFIG.CONFIDENCE && kindOf(top.className) !== "none";
+      $("verdict").textContent = sign ? top.className : (kindOf(top.className) === "none" ? "No sign" : "Not sure");
+      if (!live) { setHold(0, false, "Upload mode shows a result only. Use the webcam to build a sentence."); return; }
+      if (emergencyOn) return;
+      if (mode === "learn") handleLearn(top); else handleHold(preds, top);
+    }
+
+    /* ---------- Translate: hold to confirm ---------- */
+    function setHold(frac, done, msg) {
+      $("hold").querySelector("span").style.width = (frac * 100) + "%";
+      $("hold").classList.toggle("done", !!done);
+      $("holdmsg").textContent = msg;
+    }
+
+    function handleHold(preds, top) {
+      const ok = top.probability >= CONFIG.CONFIDENCE && kindOf(top.className) !== "none";
+      if (!ok) { cand = null; locked = false; setHold(0, false, "Hold a sign steady to add it."); return; }
+      if (top.className !== cand) { cand = top.className; candStart = performance.now(); locked = false; acc = {}; frames = 0; }
+      preds.forEach(p => { acc[p.className] = (acc[p.className] || 0) + p.probability; });
+      frames++;
+      if (locked) { setHold(1, true, "Added. Lower your hand or change sign to continue."); return; }
+      const need = isEmergency(top.className) ? CONFIG.EMERGENCY_HOLD_MS : CONFIG.HOLD_MS;
+      const f = Math.min((performance.now() - candStart) / need, 1);
+      setHold(f, false, isEmergency(top.className) ? "Keep holding to send the alert…" : "Hold steady…");
+      if (f >= 1) { locked = true; confirmSign(top.className); }
+    }
+
+    function confirmSign(name) {
+      if (isEmergency(name)) { triggerEmergency(); return; }
+      if (kindOf(name) === "letter") {
+        const avg = {}; for (const k in acc) avg[k] = acc[k] / frames;
+        const letters = Object.entries(avg).filter(([n]) => kindOf(n) === "letter").map(([n, p]) => [norm(n), p]);
+        const sum = letters.reduce((a, b) => a + b[1], 0) || 1;
+        const dist = letters.map(([n, p]) => [n, p / sum]).sort((a, b) => b[1] - a[1]).slice(0, 3);
+        const ch = norm(name);
+        if (!dist.some(d => d && d[0] === ch)) {
+          if (dist.length >= 3) dist[2] = [ch, (avg[name] || 0) / sum];
+          else dist.push([ch, (avg[name] || 0) / sum]);
+        }
+        tokens.push({ t: "l", ch, dist });
+      } else {
+        tokens.push({ t: "w", text: norm(name) });
+      }
+      renderSentence();
+    }
+
+    /* ---------- Sentence and spelling correction ---------- */
+    function toText() {
+      let s = "";
+      for (const k of tokens) {
+        if (k.t === "l") s += k.ch;
+        else if (k.t === "s") { if (s && !s.endsWith(" ")) s += " "; }
+        else { if (s && !s.endsWith(" ")) s += " "; s += k.text + " "; }
+      }
+      return s;
+    }
+
+    function partialTokens() {
+      const p = [];
+      for (let i = tokens.length - 1; i >= 0 && tokens[i].t === "l"; i--) p.unshift(tokens[i]);
+      return p;
+    }
+
+    // Score every dictionary word against the model's top guesses for each letter signed.
+    function suggest(p) {
+      if (!p.length) return [];
+      const allowed = p.length >= 3 ? CONFIG.MAX_MISSES : 0;
+      const out = [];
+      CONFIG.WORD_LIST.forEach((w, rank) => {
+        if (w.length < p.length) return;
+        let score = 0, miss = 0;
+        for (let i = 0; i < p.length; i++) {
+          const hit = p[i].dist.find(d => d[0] === w[i]);
+          if (hit) score += Math.log(hit[1] + 0.01); else { miss++; score += Math.log(0.01); }
+        }
+        if (miss > allowed) return;
+        score -= 0.15 * (w.length - p.length) + 0.05 * Math.log(rank + 2);
+        out.push({ w, score });
+      });
+      return out.sort((a, b) => b.score - a.score).slice(0, 5);
+    }
+
+    function renderSentence() {
+      const s = $("sentence");
+      s.textContent = toText();
+      const caret = document.createElement("span"); caret.className = "caret"; s.appendChild(caret);
+      const p = partialTokens();
+      $("alts").textContent = p.length ? "Model guesses: " + p.map(k => k.dist.map(d => d[0]).join("/")).join("  ·  ") : "";
+      const box = $("sugg"); box.innerHTML = "";
+      suggest(p).forEach(({ w }) => {
+        const b = document.createElement("button");
+        b.textContent = w;
+        b.addEventListener("click", () => { tokens.length -= p.length; tokens.push({ t: "w", text: w }); renderSentence(); });
+        box.appendChild(b);
+      });
+    }
+
+    function speakNow(text) {
+      if (!("speechSynthesis" in window)) { setStatus("This browser cannot read text aloud. Try Chrome."); return; }
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = CONFIG.SPEECH_LANG;
+      speechSynthesis.speak(u);
+    }
+
+    $("speak").addEventListener("click", () => { const t = toText().trim(); if (t) speakNow(t); });
+    $("space").addEventListener("click", () => { if (tokens.length && tokens[tokens.length - 1].t !== "s") { tokens.push({ t: "s" }); renderSentence(); } });
+    $("back").addEventListener("click", () => { tokens.pop(); renderSentence(); });
+    $("clear").addEventListener("click", () => { tokens = []; renderSentence(); });
+
+    /* ---------- Emergency mode ---------- */
+    function triggerEmergency() {
+      if (emergencyOn) return;
+      emergencyOn = true;
+      $("alert-time").textContent = "Alert raised at " + new Date().toLocaleTimeString();
+      $("alert").hidden = false;
+      $("dismiss").focus();
+      speakNow(CONFIG.EMERGENCY_MESSAGE);
+      emTimer = setInterval(() => speakNow(CONFIG.EMERGENCY_MESSAGE), 4000);
+    }
+
+    function dismissEmergency() {
+      emergencyOn = false;
+      clearInterval(emTimer);
+      if ("speechSynthesis" in window) speechSynthesis.cancel();
+      $("alert").hidden = true;
+      cand = null; locked = false;
+    }
+
+    $("dismiss").addEventListener("click", dismissEmergency);
+    $("test-alert").addEventListener("click", triggerEmergency);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && emergencyOn) dismissEmergency(); });
+
+    /* ---------- Learn mode ---------- */
+    function learnPool() {
+      return model ? model.getClassLabels().filter(l => kindOf(l) === "letter" && !CONFIG.LEARN_EXCLUDE.includes(norm(l))) : [];
+    }
+
+    function nextTarget() {
+      const pool = learnPool();
+      if (!pool.length) { $("ln-msg").textContent = "No letter classes found in the model."; return; }
+      let n;
+      do { n = pool[Math.floor(Math.random() * pool.length)]; } while (n === learn.target && pool.length > 1);
+      learn.target = n; learn.start = 0; learn.locked = false;
+      $("ln-letter").textContent = n;
+      $("target").classList.remove("win");
+      const ref = $("ln-ref"); ref.innerHTML = "";
+      const src = CONFIG.LEARN_IMAGES[norm(n)];
+      if (src) { const img = document.createElement("img"); img.src = src; img.alt = "Reference handshape for " + n; ref.appendChild(img); }
+      setLearnHold(0);
+      $("ln-msg").textContent = "Show the letter above and hold it steady.";
+    }
+
+    function setLearnHold(f) { $("ln-hold").querySelector("span").style.width = (f * 100) + "%"; }
+
+    function renderScore() {
+      $("ln-score").textContent = learn.score;
+      $("ln-streak").textContent = learn.streak;
+      $("ln-best").textContent = learn.best;
+    }
+
+    function handleLearn(top) {
+      if (!learn.target || learn.locked) return;
+      const hit = norm(top.className) === norm(learn.target) && top.probability >= CONFIG.CONFIDENCE;
+      if (!hit) {
+        learn.start = 0; setLearnHold(0);
+        $("ln-msg").textContent = kindOf(top.className) === "none" ? "Show the letter above and hold it steady." : "The model sees “" + top.className + "”. Adjust your hand.";
+        return;
+      }
+      if (!learn.start) learn.start = performance.now();
+      const f = Math.min((performance.now() - learn.start) / CONFIG.LEARN_HOLD_MS, 1);
+      setLearnHold(f);
+      $("ln-msg").textContent = "Hold it…";
+      if (f >= 1) {
+        learn.locked = true; learn.score++; learn.streak++; learn.best = Math.max(learn.best, learn.streak);
+        $("target").classList.add("win"); $("ln-msg").textContent = "Correct!"; renderScore();
+        setTimeout(nextTarget, 1200);
+      }
+    }
+
+    $("ln-skip").addEventListener("click", () => { learn.streak = 0; renderScore(); nextTarget(); });
+    $("ln-reset").addEventListener("click", () => { learn.score = 0; learn.streak = 0; learn.best = 0; renderScore(); });
+
+    /* ---------- Mode tabs ---------- */
+    function setMode(m) {
+      mode = m;
+      $("tab-tr").setAttribute("aria-selected", m === "translate");
+      $("tab-ln").setAttribute("aria-selected", m === "learn");
+      $("panel-tr").hidden = m !== "translate";
+      $("panel-ln").hidden = m !== "learn";
+      cand = null; locked = false;
+      if (m === "learn" && model && !learn.target) nextTarget();
+    }
+    $("tab-tr").addEventListener("click", () => setMode("translate"));
+    $("tab-ln").addEventListener("click", () => setMode("learn"));
+
+    /* ---------- Webcam and upload ---------- */
+    async function startCam() {
+      if (!model || camOn) return;
+      try {
+        webcam = new tmImage.Webcam(CONFIG.WEBCAM_SIZE, CONFIG.WEBCAM_SIZE, CONFIG.WEBCAM_FLIP);
+        await webcam.setup();
+        await webcam.play();
+      } catch (err) {
+        console.error(err);
+        stage.innerHTML = '<p class="hint">Camera unavailable. Allow camera access, or use Upload test image.</p>';
+        setSrc("up");
+        return;
+      }
+      camOn = true; cand = null; locked = false;
+      stage.innerHTML = ""; stage.appendChild(webcam.canvas);
+      const loop = async () => {
+        if (!camOn) return;
+        webcam.update();
+        await predict(webcam.canvas, true);
+        rafId = requestAnimationFrame(loop);
+      };
+      loop();
+    }
+
+    function stopCam() {
+      camOn = false;
+      if (rafId) cancelAnimationFrame(rafId);
+      if (webcam) { webcam.stop(); webcam = null; }
+    }
+
+    function setSrc(w) {
+      $("src-cam").setAttribute("aria-pressed", w === "cam");
+      $("src-up").setAttribute("aria-pressed", w === "up");
+    }
+
+    $("src-cam").addEventListener("click", async () => { setSrc("cam"); await startCam(); });
+    $("src-up").addEventListener("click", () => {
+      stopCam(); setSrc("up");
+      stage.innerHTML = '<p class="hint">Drop an image here, or click to pick one.</p>';
+    });
+
+    function handleFile(file) {
+      if (!file || !file.type.startsWith("image/")) { setStatus("Please choose an image file."); return; }
+      stopCam(); setSrc("up");
+      const r = new FileReader();
+      r.onload = () => {
+        const img = new Image();
+        img.alt = "Selected image";
+        img.onload = async () => { stage.innerHTML = ""; stage.appendChild(img); await predict(img, false); };
+        img.src = r.result;
+      };
+      r.readAsDataURL(file);
+    }
+
+    stage.addEventListener("click", () => { if (!camOn) fileInput.click(); });
+    stage.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !camOn) { e.preventDefault(); fileInput.click(); } });
+    fileInput.addEventListener("change", () => handleFile(fileInput.files[0]));
+    ["dragenter", "dragover"].forEach(t => stage.addEventListener(t, (e) => { e.preventDefault(); stage.classList.add("over"); }));
+    ["dragleave", "drop"].forEach(t => stage.addEventListener(t, (e) => { e.preventDefault(); stage.classList.remove("over"); }));
+    stage.addEventListener("drop", (e) => handleFile(e.dataTransfer.files[0]));
+
+    init();
+  </script>
+</body>
+
+</html>
